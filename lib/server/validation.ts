@@ -1,0 +1,4 @@
+import { z } from "zod";
+export const farmSchema = z.object({ name: z.string().trim().min(2).max(80), acreage: z.coerce.number().positive().max(1000), irrigation: z.string().trim().min(2).max(80), soilType: z.string().trim().max(80).optional(), village: z.string().trim().max(80).optional() });
+export const profileSchema = z.object({ fullName: z.string().trim().min(2).max(100), district: z.string().trim().min(2).max(80), stateCode: z.string().trim().length(2).default("TN"), stateName: z.string().trim().min(2).max(80).default("Tamil Nadu"), waterAccess: z.enum(["LIMITED", "MODERATE", "RELIABLE"]), preferredLanguage: z.enum(["en", "ta"]).default("en") });
+export const schemeMatchSchema = z.object({ cropName: z.string().trim().min(2).max(60).optional(), stateCode: z.string().trim().length(2).default("TN") });

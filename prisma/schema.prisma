@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  FARMER
+  DEVELOPER
+}
+enum WaterAccess {
+  LIMITED
+  MODERATE
+  RELIABLE
+}
+enum ApplicationState {
+  DRAFT
+  DOCUMENTS_REQUIRED
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+enum JourneyStepState {
+  LOCKED
+  CURRENT
+  COMPLETE
+}
+enum SourceType {
+  CENTRAL
+  STATE
+  INTERNAL
+}
+model User {
+id String @id @default(cuid())
+  email String @unique
+  role Role @default(FARMER)
+  isDemo Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmerProfile FarmerProfile?
+  applications Application[]
+  journeys Journey[]
+  notifications Notification[]
+  aiInteractions AIInteraction[]
+  auditLogs AuditLog[]
+}
+model FarmerProfile {
+id String @id @default(cuid())
+  userId String @unique
+  fullName String
+  stateCode String @default("TN")
+  stateName String @default("Tamil Nadu")
+  district String
+  preferredLanguage String @default("en")
+  waterAccess WaterAccess @default(LIMITED)
+  source String @default("Synthetic demo data")
+  sourceType SourceType @default(INTERNAL)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  farms Farm[]
+  benefitMatches BenefitMatch[]
+  insurancePolicies InsurancePolicy[]
+  damageReports DamageReport[]
+  advisories Advisory[]
+}
+model Farm {
+id String @id @default(cuid())
+  farmerProfileId String
+  name String
+  acreage Decimal @db.Decimal(6,2)
+  irrigation String
+  soilType String?
+  village String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmerProfile FarmerProfile @relation(fields:[farmerProfileId],references:[id],onDelete:Cascade)
+  cropSeasons CropSeason[]
+  waterData WaterData[]
+  @@index([farmerProfileId])
+}
+model Crop {
+id String @id @default(cuid())
+  name String @unique
+  category String
+  waterNeed String
+  source String @default("Synthetic agronomy reference")
+  sourceType SourceType @default(INTERNAL)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cropSeasons CropSeason[]
+  schemes Scheme[]
+}
+model CropSeason {
+id String @id @default(cuid())
+  farmId String
+  cropId String
+  season String
+  year Int
+  status String @default("PLANNED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farm Farm @relation(fields:[farmId],references:[id],onDelete:Cascade)
+  crop Crop @relation(fields:[cropId],references:[id])
+  @@index([farmId,year])
+}
+model Scheme {
+id String @id @default(cuid())
+  code String @unique
+  name String
+  description String
+  stateCode String?
+  category String
+  source String
+  sourceType SourceType
+  sourceUpdatedAt DateTime
+  isMock Boolean @default(true)
+  active Boolean @default(true)
+  cropId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  crop Crop? @relation(fields:[cropId],references:[id])
+  eligibilityRules SchemeEligibilityRule[]
+  benefitMatches BenefitMatch[]
+  applications Application[]
+  documentRequirements DocumentRequirement[]
+  @@index([stateCode,active])
+}
+model SchemeEligibilityRule {
+id String @id @default(cuid())
+  schemeId String
+  ruleType String
+  ruleValue String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  scheme Scheme @relation(fields:[schemeId],references:[id],onDelete:Cascade)
+}
+model BenefitMatch {
+id String @id @default(cuid())
+  farmerProfileId String
+  schemeId String
+  score Int
+  rationale String
+  status String @default("POTENTIALLY_RELEVANT")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmerProfile FarmerProfile @relation(fields:[farmerProfileId],references:[id],onDelete:Cascade)
+  scheme Scheme @relation(fields:[schemeId],references:[id])
+  @@unique([farmerProfileId,schemeId])
+}
+model Application {
+id String @id @default(cuid())
+  userId String
+  schemeId String
+  state ApplicationState @default(DRAFT)
+  referenceCode String @unique
+  submittedAt DateTime?
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id])
+  scheme Scheme @relation(fields:[schemeId],references:[id])
+  statuses ApplicationStatus[]
+}
+model ApplicationStatus {
+id String @id @default(cuid())
+  applicationId String
+  state ApplicationState
+  message String
+  isCurrent Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  application Application @relation(fields:[applicationId],references:[id],onDelete:Cascade)
+  @@index([applicationId,isCurrent])
+}
+model InsurancePolicy {
+id String @id @default(cuid())
+  farmerProfileId String
+  providerName String
+  cropName String
+  status String
+  source String
+  sourceType SourceType @default(INTERNAL)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmerProfile FarmerProfile @relation(fields:[farmerProfileId],references:[id],onDelete:Cascade)
+}
+model DamageReport {
+id String @id @default(cuid())
+  farmerProfileId String
+  cropName String
+  incidentType String
+  status String @default("DRAFT")
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmerProfile FarmerProfile @relation(fields:[farmerProfileId],references:[id],onDelete:Cascade)
+  assessment DamageAssessment?
+}
+model DamageAssessment {
+id String @id @default(cuid())
+  damageReportId String @unique
+  severity String
+  notes String
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  damageReport DamageReport @relation(fields:[damageReportId],references:[id],onDelete:Cascade)
+}
+model Market {
+id String @id @default(cuid())
+  name String
+  district String
+  stateCode String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  prices MarketPrice[]
+}
+model MarketPrice {
+id String @id @default(cuid())
+  marketId String
+  cropName String
+  pricePerQuintal Decimal @db.Decimal(10,2)
+  observedAt DateTime
+  source String
+  sourceType SourceType @default(INTERNAL)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  market Market @relation(fields:[marketId],references:[id],onDelete:Cascade)
+  @@index([cropName,observedAt])
+}
+model WaterData {
+id String @id @default(cuid())
+  farmId String
+  status String
+  notes String
+  source String
+  sourceType SourceType @default(INTERNAL)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farm Farm @relation(fields:[farmId],references:[id],onDelete:Cascade)
+}
+model Advisory {
+id String @id @default(cuid())
+  farmerProfileId String
+  title String
+  body String
+  source String
+  sourceType SourceType @default(INTERNAL)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmerProfile FarmerProfile @relation(fields:[farmerProfileId],references:[id],onDelete:Cascade)
+}
+model Notification {
+id String @id @default(cuid())
+  userId String
+  title String
+  body String
+  readAt DateTime?
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+}
+model Journey {
+id String @id @default(cuid())
+  userId String
+  name String
+  status String @default("ACTIVE")
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  steps JourneyStep[]
+}
+model JourneyStep {
+id String @id @default(cuid())
+  journeyId String
+  title String
+  description String
+  position Int
+  state JourneyStepState @default(LOCKED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  journey Journey @relation(fields:[journeyId],references:[id],onDelete:Cascade)
+  @@unique([journeyId,position])
+}
+model DocumentRequirement {
+id String @id @default(cuid())
+  schemeId String
+  title String
+  description String
+  required Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  scheme Scheme @relation(fields:[schemeId],references:[id],onDelete:Cascade)
+}
+model AIInteraction {
+id String @id @default(cuid())
+  userId String
+  intent String
+  inputSummary String
+  outputSummary String
+  fallbackUsed Boolean @default(false)
+  isMock Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+}
+model AuditLog {
+id String @id @default(cuid())
+  userId String?
+  action String
+  entityType String
+  entityId String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User? @relation(fields:[userId],references:[id],onDelete:SetNull)
+  @@index([entityType,entityId])
+}
+
+
